@@ -1,5 +1,6 @@
 ---
 title: "Assignment 1"
+author: "Ted Van Green"
 subtitle: "Due at 11:59pm on September 16."
 format: html 
 editor: visual
@@ -25,7 +26,7 @@ Download both the Angell.dta (Stata data format) dataset and the Angell.txt data
 
 2\) Read in the .dta version and store in an object called `angell_stata`.
 
-```{r}
+```{r warning=FALSE}
 #reading in the dta file
 library(haven)
 
@@ -35,7 +36,7 @@ angell_stata <- read_dta("angell (1).dta")
 
 3\) Read in the .txt version and store it in an object called `angell_txt`.
 
-```{r}
+```{r warning=FALSE}
 #reading in the txt file
 library(readr)
 angell_txt <- read_table("angell-txt.txt", col_names = F)
@@ -53,7 +54,7 @@ str(angell_txt)
 
 ```
 
-There is an extra column in the angell_txt version. There don't appear to be differences between the classes of the columns in each one.
+There is an extra column in the angell_txt version. There don't appear to be differences between the classes of the columns in each one. There are no column names for the txt file.
 
 5\) Make any updates necessary so that `angell_txt` is the same as `angell_stata`.
 
@@ -61,21 +62,36 @@ There is an extra column in the angell_txt version. There don't appear to be dif
 #dropping the last column from the txt version of the data
 angell_txt <- angell_txt[,c(1:5)]
 
+#adding column names
+colnames(angell_txt) <- colnames(angell_stata)
+colnames(angell_stata)
+colnames(angell_txt)
 ```
+
+I added column names to the txt file, as well as dropped the column of NAs from that file as well.
 
 6\) Describe the Ethnic Heterogeneity variable. Use descriptive statistics such as mean, median, standard deviation, etc. How does it differ by region?
 
-```{r}
+```{r warning=FALSE}
 #using summary and sd, then looking by region 
 summary(angell_stata$ethhet)
 sd(angell_stata$ethhet)
-aggregate(ethhet~region, angell_stata, summary)
+
+library(tidyverse)
+#ethhet by region
+angell_stata %>%
+  group_by(region) %>%
+  summarize(min = min(ethhet),
+            max = max(ethhet),
+            mean = mean(ethhet),
+            median = median(ethhet),
+            sd = sd(ethhet))
 
 ```
 
 The mean is 31.37, the median is 23.7, the standard deviation is 20.41.
 
-By region, the south has a higher mean and median than other regions, while the west has a slightly lower value on both.
+By region, the south has a higher mean and median than other regions, while the west has a slightly lower value on both. The south has a much higher standard deviation.
 
 ## Describing Data
 
@@ -85,9 +101,10 @@ R comes also with many built-in datasets. The "MASS" package, for example, comes
 
 ```{r}
 #reading in the data
-install.packages("MASS")
+#install.packages("MASS")
 library(MASS)
 
+data("Boston")
 
 ```
 
@@ -149,12 +166,22 @@ There are a couple of districts with fairly low parent teacher ratios, but this 
 
 ```{r}
 #recoding the crime variable into a binary
-Boston$crime_bin <- ifelse(Boston$crim>1, 1,0)
+Boston$crime_bin <- ifelse(Boston$crim>1, "Crime rate >1","Crime rate <1")
 
 #looking at the ptratio variable by the crime variable
 boxplot(Boston$ptratio~Boston$crime_bin, xlab = "Crime bin, 0=lower and 1=higher",
         ylab = "pupil-teacher ratio")
+
 tapply(Boston$ptratio, Boston$crime_bin, summary)
+
+Boston %>% 
+  group_by(crime_bin) %>% 
+  summarize(min=min(ptratio),
+            max = max(ptratio),
+            mean = mean(ptratio),
+            median = median(ptratio),
+            IQR = IQR(ptratio))
+
 ```
 
 There is less of a spread in those districts that have a crime rate greater than 1, with the 1st quartile and the 3rd quartile having the same value. For those with a lower crime rate, there is more of a spread between the first and third quartile (16.8-19.2)
@@ -191,7 +218,7 @@ my_CI2 <- function(mean, se){
   lower <- round(mean - (1.96*se),3)
   upper <- round(mean + (1.96*se),3)
   
-  print(c(lower,upper))
+  return(c(lower,upper))
 }
 
 my_CI2(0,0.4)
@@ -211,10 +238,10 @@ my_CI3 <- function(mean, se, ci_level){
   lower <- round(mean - (z_score*se),3)
   upper <- round(mean + (z_score*se),3)
   
-  print(c(lower,upper))
+  return(c(lower,upper))
 }
 
-my_CI3(0,0.4,0.99)
+my_CI3(0,0.4,0.95)
 
 ```
 
@@ -222,18 +249,18 @@ my_CI3(0,0.4,0.99)
 
 ```{r}
 
-my_CI4 <- function(col_name){
+my_CI4 <- function(col_name, ci_level){
   
-  z <- qnorm(.995)
+  z <- qnorm(1-(1-ci_level)/2)
   se <- sd(col_name)/sqrt(length(col_name))
   
   lower <- round(mean(col_name) - (z*se),3)
   upper <- round(mean(col_name) + (z*se),3)
-  print(c(lower,upper))
+  return(c(lower,upper))
   
 }
 
-my_CI4(angell_stata$ethhet)
+my_CI4(angell_stata$ethhet, .99)
 ```
 
 The 99% confidence interval for the ethnic heterogeneity is 23.354-39.39.
@@ -242,19 +269,30 @@ The 99% confidence interval for the ethnic heterogeneity is 23.354-39.39.
 
 ```{r}
 
-my_CI5 <- function(col_name){
+my_CI5 <- function(dataset){
+  output <- NULL
+  #subsetting so this runs on each column
+  for(i in colnames(dataset)) {
+  col_name <- dataset[[i]]
   
-  if(is.numeric(col_name) || is.logical(col_name)){
+  #
+  if(is.numeric(col_name) | is.logical(col_name)){
   
   se <- sd(col_name)/sqrt(length(col_name))
   
   lower <- round(mean(col_name) - (1.96*se),3)
   upper <- round(mean(col_name) + (1.96*se),3)
   
-  print(c(lower,upper))
+  output <- rbind(output, c(i, lower, upper))
   }
-  else {return(NA)}
+  else {
+    output <- rbind(output, c(i, NA, NA))}
+  }
+  colnames(output) <- c("var", "lower bound", "upper bound")
+  return(output)
 }
 
-my_CI5(angell_stata$morint)
+my_CI5(angell_stata)
 ```
+
+Here is that function applied to the Angel dataset.
