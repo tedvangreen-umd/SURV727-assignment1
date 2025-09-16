@@ -2,7 +2,9 @@
 title: "Assignment 1"
 author: "Ted Van Green"
 subtitle: "Due at 11:59pm on September 16."
-format: html 
+format: 
+  html: 
+    embed-resources: true
 editor: visual
 ---
 
